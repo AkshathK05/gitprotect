@@ -1,0 +1,93 @@
+[[rule]]
+id = "FILE-001"
+severity = "block"
+kind = "path"
+globs = [
+  '''.env''',
+  '''.env.*''',
+  '''*.pem''',
+  '''*.key''',
+  '''id_rsa''',
+  '''id_ed25519''',
+  '''firebase-adminsdk-*.json''',
+  '''credentials.json''',
+  '''service-account*.json''',
+  '''**/.env''',
+  '''**/.env.*''',
+  '''**/*.pem''',
+  '''**/*.key''',
+  '''**/id_rsa''',
+  '''**/id_ed25519''',
+  '''**/firebase-adminsdk-*.json''',
+  '''**/credentials.json''',
+  '''**/service-account*.json''',
+]
+path_exclude = [
+  '''.env.example''',
+  '''.env.sample''',
+  '''.env.template''',
+  '''**/.env.example''',
+  '''**/.env.sample''',
+  '''**/.env.template''',
+]
+title = "Forbidden Sensitive File Staged"
+what_happened = "A sensitive credential, key, or environment configuration file was staged for commit."
+fix_steps = [
+  "Add the file pattern to your repository's .gitignore.",
+  "Unstage the file with `git restore --staged <file>`.",
+  "Never commit secret configuration files or private keys.",
+]
+
+[[rule]]
+id = "FILE-002"
+severity = "block"
+kind = "path"
+globs = [
+  '''*.sqlite''',
+  '''*.sqlite3''',
+  '''*.db''',
+  '''**/*.sqlite''',
+  '''**/*.sqlite3''',
+  '''**/*.db''',
+]
+title = "Forbidden Database File Staged"
+what_happened = "A local database binary file (.sqlite, .sqlite3, .db) was staged."
+fix_steps = [
+  "Add local database files (*.sqlite, *.sqlite3, *.db) to .gitignore.",
+  "Unstage the file with `git restore --staged <file>`.",
+]
+
+[[rule]]
+id = "FILE-002"
+severity = "warn"
+kind = "path"
+globs = []
+title = "Large or Dumped SQL Database File"
+what_happened = "A SQL file that appears to be a database backup/dump or exceeds 1MB was staged."
+fix_steps = [
+  "Ensure database dumps containing user data are not committed to Git.",
+  "Consider storing database backups in dedicated secure object storage.",
+]
+
+[[rule]]
+id = "FILE-003"
+severity = "warn"
+kind = "path"
+globs = []
+title = "Missing .env in .gitignore"
+what_happened = "A .env or .env.example file was staged, but .gitignore does not contain a rule starting with .env."
+fix_steps = [
+  "Add `.env*` or `.env` to your repository's `.gitignore` file to prevent accidental secret leaks.",
+]
+
+[[rule]]
+id = "FILE-004"
+severity = "warn"
+kind = "path"
+globs = []
+title = "File Exceeds Size Limit"
+what_happened = "A staged file exceeds the configured maximum allowed file size."
+fix_steps = [
+  "Check whether large binary or media files should be tracked via Git LFS or external storage.",
+  "If intentional, raise `max_file_bytes` in `.gitprotect.toml`.",
+]

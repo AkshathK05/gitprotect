@@ -1,0 +1,10 @@
+[workspace]
+members = [
+    "crates/gitprotect-core",
+    "crates/gitprotect-cli",
+]
+resolver = "2"
+
+[workspace.package]
+repository = "https://github.com/AkshathK05/gitprotect"
+

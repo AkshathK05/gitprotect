@@ -1,0 +1,22 @@
+[package]
+name = "gitprotect-cli"
+version = "0.1.0-beta.1"
+edition = "2024"
+repository.workspace = true
+
+[[bin]]
+name = "gitprotect"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1.0.105"
+clap = { version = "4.6.9", features = ["derive"] }
+gitprotect-core = { version = "0.1.0-beta.1", path = "../gitprotect-core" }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+toml = "1.2.2"
+
+[dev-dependencies]
+assert_cmd = "2.2.2"
+predicates = "3.1.4"
+tempfile = "3.27.0"

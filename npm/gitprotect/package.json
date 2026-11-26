@@ -1,0 +1,29 @@
+{
+  "name": "@akshathk/gitprotect",
+  "version": "0.1.0-beta.1",
+  "description": "Security hook preventing leaked secrets and security mistakes for vibecoders",
+  "bin": {
+    "gitprotect": "./bin/gitprotect.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AkshathK05/gitprotect.git"
+  },
+  "license": "MIT",
+  "files": [
+    "bin",
+    "README.md",
+    "LICENSE"
+  ],
+  "optionalDependencies": {
+    "@akshathk/gitprotect-darwin-arm64": "0.1.0-beta.1",
+    "@akshathk/gitprotect-darwin-x64": "0.1.0-beta.1",
+    "@akshathk/gitprotect-linux-arm64": "0.1.0-beta.1",
+    "@akshathk/gitprotect-linux-x64": "0.1.0-beta.1",
+    "@akshathk/gitprotect-win32-x64": "0.1.0-beta.1"
+  },
+  "homepage": "https://github.com/AkshathK05/gitprotect#readme",
+  "bugs": {
+    "url": "https://github.com/AkshathK05/gitprotect/issues"
+  }
+}

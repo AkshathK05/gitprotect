@@ -1,0 +1,296 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Run npm publish in dry-run mode without publishing'
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  check-versions:
+    name: Verify Version Consistency
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify versions match across Cargo.toml and package.json files
+        run: |
+          CLI_VERSION=$(grep -m1 '^version =' crates/gitprotect-cli/Cargo.toml | cut -d '"' -f2)
+          CORE_VERSION=$(grep -m1 '^version =' crates/gitprotect-core/Cargo.toml | cut -d '"' -f2)
+          WRAPPER_VERSION=$(node -p "require('./npm/gitprotect/package.json').version")
+          echo "Cargo CLI version: $CLI_VERSION"
+          echo "Cargo Core version: $CORE_VERSION"
+          echo "npm/gitprotect version: $WRAPPER_VERSION"
+
+          if [ "$CLI_VERSION" != "$CORE_VERSION" ]; then
+            echo "Error: crates/gitprotect-cli version ($CLI_VERSION) does not match crates/gitprotect-core ($CORE_VERSION)"
+            exit 1
+          fi
+
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            TAG_VERSION="${GITHUB_REF_NAME#v}"
+            echo "Tag version: $TAG_VERSION"
+            if [ "$TAG_VERSION" != "$CLI_VERSION" ]; then
+              echo "Error: Git tag version ($TAG_VERSION) does not match Cargo.toml version ($CLI_VERSION)"
+              exit 1
+            fi
+            if [ "$TAG_VERSION" != "$WRAPPER_VERSION" ]; then
+              echo "Error: Git tag version ($TAG_VERSION) does not match npm/gitprotect/package.json version ($WRAPPER_VERSION)"
+              exit 1
+            fi
+            EXPECTED_VERSION="$TAG_VERSION"
+          else
+            echo "Running on non-tag branch / workflow_dispatch, using Cargo.toml version: $CLI_VERSION"
+            if [ "$CLI_VERSION" != "$WRAPPER_VERSION" ]; then
+              echo "Error: Cargo.toml version ($CLI_VERSION) does not match npm/gitprotect/package.json ($WRAPPER_VERSION)"
+              exit 1
+            fi
+            EXPECTED_VERSION="$CLI_VERSION"
+          fi
+
+          PKGS=("gitprotect" "gitprotect-darwin-arm64" "gitprotect-darwin-x64" "gitprotect-linux-x64" "gitprotect-linux-arm64" "gitprotect-win32-x64")
+          for pkg in "${PKGS[@]}"; do
+            PKG_VERSION=$(node -p "require('./npm/$pkg/package.json').version")
+            echo "npm/$pkg version: $PKG_VERSION"
+            if [ "$PKG_VERSION" != "$EXPECTED_VERSION" ]; then
+              echo "Error: npm/$pkg version ($PKG_VERSION) does not match expected version ($EXPECTED_VERSION)"
+              exit 1
+            fi
+          done
+
+          echo "All versions successfully verified and match $EXPECTED_VERSION."
+
+  build:
+    name: Build (${{ matrix.target }})
+    needs: check-versions
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            target: aarch64-apple-darwin
+            pkg: gitprotect-darwin-arm64
+            bin: gitprotect
+            arch_pattern: "Mach-O.*arm64"
+            use_cross: false
+          - os: macos-14
+            target: x86_64-apple-darwin
+            pkg: gitprotect-darwin-x64
+            bin: gitprotect
+            arch_pattern: "Mach-O.*x86_64"
+            use_cross: false
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+            pkg: gitprotect-linux-x64
+            bin: gitprotect
+            arch_pattern: "ELF.*x86-64"
+            use_cross: false
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-musl
+            pkg: gitprotect-linux-arm64
+            bin: gitprotect
+            arch_pattern: "ELF.*aarch64"
+            use_cross: true
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            pkg: gitprotect-win32-x64
+            bin: gitprotect.exe
+            arch_pattern: "PE32+.*x86-64"
+            use_cross: false
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install Linux build dependencies (musl-tools)
+        if: matrix.target == 'x86_64-unknown-linux-musl'
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+
+      - name: Install cross
+        if: matrix.use_cross
+        run: cargo install cross --git https://github.com/cross-rs/cross
+
+      - name: Build binary (native cargo)
+        if: "!matrix.use_cross"
+        run: cargo build --release --target ${{ matrix.target }} --bin gitprotect
+
+      - name: Build binary (cross)
+        if: matrix.use_cross
+        run: cross build --release --target ${{ matrix.target }} --bin gitprotect
+
+      - name: Ad-hoc codesign on macOS
+        if: runner.os == 'macOS'
+        run: |
+          codesign --force -s - "target/${{ matrix.target }}/release/${{ matrix.bin }}"
+          codesign -v "target/${{ matrix.target }}/release/${{ matrix.bin }}"
+
+      - name: Verify binary existence and architecture
+        shell: bash
+        run: |
+          BIN_PATH="target/${{ matrix.target }}/release/${{ matrix.bin }}"
+          if [ ! -f "$BIN_PATH" ]; then
+            echo "Error: Binary not found at $BIN_PATH" >&2
+            exit 1
+          fi
+          FILE_OUT=$(file "$BIN_PATH")
+          echo "$FILE_OUT"
+          if ! echo "$FILE_OUT" | grep -qE "${{ matrix.arch_pattern }}"; then
+            echo "Error: $BIN_PATH does not match expected architecture pattern '${{ matrix.arch_pattern }}'" >&2
+            exit 1
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.pkg }}
+          path: target/${{ matrix.target }}/release/${{ matrix.bin }}
+          if-no-files-found: error
+
+  publish:
+    name: Publish npm packages
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: 'https://registry.npmjs.org'
+
+      # Download all 5 platform binary artifacts
+      - uses: actions/download-artifact@v4
+        with:
+          name: gitprotect-darwin-arm64
+          path: npm/gitprotect-darwin-arm64/bin
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: gitprotect-darwin-x64
+          path: npm/gitprotect-darwin-x64/bin
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: gitprotect-linux-x64
+          path: npm/gitprotect-linux-x64/bin
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: gitprotect-linux-arm64
+          path: npm/gitprotect-linux-arm64/bin
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: gitprotect-win32-x64
+          path: npm/gitprotect-win32-x64/bin
+
+      - name: Set permissions and verify all binaries exist
+        run: |
+          chmod +x npm/gitprotect-*/bin/gitprotect* || true
+          PLATFORM_BINS=(
+            "npm/gitprotect-darwin-arm64/bin/gitprotect:Mach-O.*arm64"
+            "npm/gitprotect-darwin-x64/bin/gitprotect:Mach-O.*x86_64"
+            "npm/gitprotect-linux-x64/bin/gitprotect:ELF.*x86-64"
+            "npm/gitprotect-linux-arm64/bin/gitprotect:ELF.*aarch64"
+            "npm/gitprotect-win32-x64/bin/gitprotect.exe:PE32\+.*x86-64"
+          )
+          for entry in "${PLATFORM_BINS[@]}"; do
+            BIN="${entry%%:*}"
+            PAT="${entry#*:}"
+            if [ ! -f "$BIN" ]; then
+              echo "Error: Missing platform binary: $BIN" >&2
+              exit 1
+            fi
+            F_INFO=$(file "$BIN")
+            echo "$F_INFO"
+            if ! echo "$F_INFO" | grep -qE "$PAT"; then
+              echo "Error: $BIN architecture mismatch: $F_INFO" >&2
+              exit 1
+            fi
+          done
+
+      - name: Copy README and LICENSE to packages
+        run: |
+          cp README.md npm/gitprotect/README.md
+          for p in npm/*; do
+            if [ -d "$p" ]; then
+              cp LICENSE "$p/LICENSE"
+            fi
+          done
+
+      - name: Determine publish mode
+        id: mode
+        run: |
+          VERSION=$(node -p "require('./npm/gitprotect/package.json').version")
+          echo "Package version: $VERSION"
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
+
+          if [[ "$VERSION" == *-* ]]; then
+            TAG_FLAG="--tag beta"
+            echo "Prerelease version detected ($VERSION). Setting NPM tag: beta"
+          else
+            TAG_FLAG=""
+            echo "Stable version detected ($VERSION). Setting NPM tag: default (latest)"
+          fi
+          echo "TAG_FLAG=${TAG_FLAG}" >> $GITHUB_ENV
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            echo "dry_run=true" >> $GITHUB_OUTPUT
+            echo "DRY_RUN_FLAG=--dry-run" >> $GITHUB_ENV
+            echo "Mode: DRY RUN (no publishing)"
+          elif [ "${{ github.event_name }}" = "push" ] && [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            echo "dry_run=false" >> $GITHUB_OUTPUT
+            echo "DRY_RUN_FLAG=" >> $GITHUB_ENV
+            echo "Mode: PRODUCTION RELEASE"
+          else
+            echo "dry_run=true" >> $GITHUB_OUTPUT
+            echo "DRY_RUN_FLAG=--dry-run" >> $GITHUB_ENV
+            echo "Mode: DEFAULT DRY RUN"
+          fi
+
+      - name: Publish platform packages first
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          PLATFORMS=("gitprotect-darwin-arm64" "gitprotect-darwin-x64" "gitprotect-linux-x64" "gitprotect-linux-arm64" "gitprotect-win32-x64")
+          for pkg in "${PLATFORMS[@]}"; do
+            PKG_NAME="@akshathk/$pkg"
+            EXISTING=$(npm view "${PKG_NAME}@${VERSION}" version 2>/dev/null || true)
+            if [ "$EXISTING" = "$VERSION" ]; then
+              echo "${PKG_NAME}@${VERSION} already published, skipping"
+              continue
+            fi
+            echo "Publishing ${PKG_NAME} with flags '${TAG_FLAG} ${DRY_RUN_FLAG}'..."
+            (cd "npm/$pkg" && npm publish --provenance --access public ${TAG_FLAG} ${DRY_RUN_FLAG})
+          done
+
+      - name: Publish main wrapper package
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          PKG_NAME="@akshathk/gitprotect"
+          EXISTING=$(npm view "${PKG_NAME}@${VERSION}" version 2>/dev/null || true)
+          if [ "$EXISTING" = "$VERSION" ]; then
+            echo "${PKG_NAME}@${VERSION} already published, skipping"
+          else
+            echo "Publishing ${PKG_NAME} with flags '${TAG_FLAG} ${DRY_RUN_FLAG}'..."
+            (cd npm/gitprotect && npm publish --provenance --access public ${TAG_FLAG} ${DRY_RUN_FLAG})
+          fi

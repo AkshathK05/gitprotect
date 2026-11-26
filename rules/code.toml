@@ -1,0 +1,35 @@
+[[rule]]
+id = "CODE-003"
+severity = "warn"
+kind = "line"
+patterns = [
+  '''\beval\s*\(''',
+  '''child_process\.exec\s*\(''',
+  '''shell\s*=\s*True''',
+  '''dangerouslySetInnerHTML''',
+  '''(?i)f["']\s*(select|insert|update|delete)\b[^"']*\{''',
+  '''(?i)`\s*(select|insert|update|delete)\b[^`]*\$\{''',
+]
+title = "Potentially Dangerous Code Execution or SQL Injection Pattern"
+what_happened = "Detected dynamic code execution, raw shell invocation, unsanitized HTML injection, or interpolated SQL."
+fix_steps = [
+  "Use parameterized queries instead of string formatting or template literals for SQL.",
+  "Avoid dynamic code execution like `eval` or `child_process.exec`.",
+  "Sanitize user input before rendering with `dangerouslySetInnerHTML`.",
+]
+
+[[rule]]
+id = "CODE-004"
+severity = "warn"
+kind = "line"
+patterns = [
+  '''verify\s*=\s*False''',
+  '''rejectUnauthorized\s*:\s*false''',
+  '''NODE_TLS_REJECT_UNAUTHORIZED\s*=\s*['"]?0''',
+]
+title = "TLS Certificate Verification Disabled"
+what_happened = "SSL/TLS verification is explicitly disabled, exposing network requests to man-in-the-middle attacks."
+fix_steps = [
+  "Enable TLS certificate verification for all outbound HTTP/HTTPS and database requests.",
+  "Install required CA certificates rather than disabling verification.",
+]

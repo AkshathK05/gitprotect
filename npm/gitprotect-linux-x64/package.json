@@ -1,0 +1,27 @@
+{
+  "name": "@akshathk/gitprotect-linux-x64",
+  "version": "0.1.0-beta.1",
+  "description": "Native gitprotect binary for Linux (x64)",
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "bin": {
+    "gitprotect": "./bin/gitprotect"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AkshathK05/gitprotect.git"
+  },
+  "license": "MIT",
+  "files": [
+    "bin",
+    "LICENSE"
+  ],
+  "homepage": "https://github.com/AkshathK05/gitprotect#readme",
+  "bugs": {
+    "url": "https://github.com/AkshathK05/gitprotect/issues"
+  }
+}

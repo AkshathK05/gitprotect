@@ -1,0 +1,173 @@
+[[rule]]
+id = "SEC-001"
+severity = "block"
+kind = "line"
+patterns = [
+  '''AKIA[0-9A-Z]{16}''',
+]
+title = "Exposed AWS Access Key"
+what_happened = "An AWS access key ID was detected in staged changes."
+fix_steps = [
+  "Remove the access key from the code and use environment variables instead.",
+  "If already committed or pushed, rotate the key in the AWS console immediately.",
+]
+rotate_url = "https://console.aws.amazon.com/iam/home#/security_credentials"
+
+[[rule]]
+id = "SEC-001"
+severity = "block"
+kind = "line"
+patterns = [
+  '''sk-proj-[A-Za-z0-9_-]{20,}''',
+]
+title = "Exposed OpenAI API Key"
+what_happened = "An OpenAI secret API key was detected in staged changes."
+fix_steps = [
+  "Remove the secret key from the code and load it from environment variables.",
+  "Revoke and rotate the exposed API key in OpenAI dashboard.",
+]
+rotate_url = "https://platform.openai.com/api-keys"
+
+[[rule]]
+id = "SEC-001"
+severity = "block"
+kind = "line"
+patterns = [
+  '''sk-ant-[A-Za-z0-9_-]{20,}''',
+]
+title = "Exposed Anthropic API Key"
+what_happened = "An Anthropic secret API key was detected in staged changes."
+fix_steps = [
+  "Remove the secret key from the code and use an environment variable.",
+  "Revoke and rotate the key in the Anthropic console.",
+]
+rotate_url = "https://console.anthropic.com/settings/keys"
+
+[[rule]]
+id = "SEC-001"
+severity = "block"
+kind = "line"
+patterns = [
+  '''AIza[0-9A-Za-z_-]{35}''',
+]
+title = "Exposed Google API Key"
+what_happened = "A Google Cloud/API key was detected in staged changes."
+fix_steps = [
+  "Remove the API key and use environment variables or Secret Manager.",
+  "Rotate or restrict the key in the Google Cloud console.",
+]
+rotate_url = "https://console.cloud.google.com/apis/credentials"
+
+[[rule]]
+id = "SEC-001"
+severity = "block"
+kind = "line"
+patterns = [
+  '''(sk|rk)_live_[0-9A-Za-z]{16,}''',
+]
+title = "Exposed Stripe Live API Key"
+what_happened = "A Stripe live secret or restricted key was detected in staged changes."
+fix_steps = [
+  "Remove the live key from source code immediately.",
+  "Roll and replace the key in Stripe Dashboard.",
+]
+rotate_url = "https://dashboard.stripe.com/apikeys"
+
+[[rule]]
+id = "SEC-001"
+severity = "block"
+kind = "line"
+patterns = [
+  '''rzp_live_[0-9A-Za-z]{10,}''',
+]
+title = "Exposed Razorpay Live API Key"
+what_happened = "A Razorpay live API key was detected in staged changes."
+fix_steps = [
+  "Remove the live key from source code.",
+  "Regenerate the key in Razorpay Dashboard.",
+]
+
+[[rule]]
+id = "SEC-001"
+severity = "block"
+kind = "line"
+patterns = [
+  '''gh[pousr]_[A-Za-z0-9]{36,}''',
+  '''github_pat_[A-Za-z0-9_]{22,}''',
+]
+title = "Exposed GitHub Personal Access Token"
+what_happened = "A GitHub personal access token was detected in staged changes."
+fix_steps = [
+  "Remove the token from source code.",
+  "Revoke the token in GitHub Settings and create a new one.",
+]
+rotate_url = "https://github.com/settings/tokens"
+
+[[rule]]
+id = "SEC-001"
+severity = "block"
+kind = "line"
+patterns = [
+  '''sbp_[0-9a-f]{40}''',
+]
+title = "Exposed Supabase Access Token"
+what_happened = "A Supabase personal access token was detected in staged changes."
+fix_steps = [
+  "Remove the token from source code.",
+  "Revoke and regenerate the token in Supabase account settings.",
+]
+rotate_url = "https://supabase.com/dashboard/account/tokens"
+
+[[rule]]
+id = "SEC-002"
+severity = "block"
+kind = "line"
+patterns = [
+  '''(NEXT_PUBLIC|VITE|REACT_APP|EXPO_PUBLIC)_[A-Z0-9_]*(SECRET|SERVICE_ROLE|PRIVATE|PASSWORD|ADMIN)[A-Z0-9_]*''',
+]
+title = "Public Frontend Variable Contains Secret Keyword"
+what_happened = "A public frontend environment variable name contains a sensitive keyword, risking secret leakage to client bundles."
+fix_steps = [
+  "Do not expose server-side secrets or service roles via client-accessible environment variables.",
+  "Move the secret to a server-only environment variable without public client prefixes.",
+]
+
+[[rule]]
+id = "SEC-003"
+severity = "block"
+kind = "line"
+patterns = [
+  '''(postgres(ql)?|mongodb(\+srv)?|mysql|redis)://[^\s:/@'"]+:[^\s@'"${}]+@''',
+]
+title = "Hardcoded Database Connection String with Credentials"
+what_happened = "A database URI containing plaintext password credentials was detected."
+fix_steps = [
+  "Use environment variables (e.g. DATABASE_URL) to supply connection strings at runtime.",
+  "Rotate the database user password if this file was ever committed or shared.",
+]
+
+[[rule]]
+id = "SEC-004"
+severity = "block"
+kind = "line"
+patterns = [
+  '''-----BEGIN [A-Z ]*PRIVATE KEY-----''',
+]
+title = "Embedded Private Key"
+what_happened = "An unencrypted private key header was found in staged code."
+fix_steps = [
+  "Store private keys in external secure credential storage or files specified in .gitignore.",
+  "Rotate the compromised key pair immediately.",
+]
+
+[[rule]]
+id = "SEC-005"
+severity = "warn"
+kind = "line"
+patterns = []
+title = "High Entropy String Near Sensitive Keyword"
+what_happened = "A high-entropy quoted literal was found on a line containing credential-related keywords."
+fix_steps = [
+  "Check whether this quoted string is an API secret, password, or token.",
+  "If it is a secret, move it to an environment variable or secure config.",
+]

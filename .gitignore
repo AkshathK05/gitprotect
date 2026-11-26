@@ -1,0 +1,30 @@
+# Rust build artifacts
+target/
+**/*.rs.bk
+
+# Node & npm build artifacts
+node_modules/
+*.tgz
+npm/*/*.tgz
+npm/gitprotect-darwin-arm64/bin/gitprotect
+npm/gitprotect-darwin-x64/bin/gitprotect
+
+# OS artifacts
+.DS_Store
+
+# Environment & secrets
+.env
+.env.*
+!.env.example
+
+# AI rules, prompts, and specifications
+CLAUDE.md
+Claude.md
+claude.md
+SPEC.md
+ASSUMPTIONS.md
+.cursorrules
+.cursor/
+.windsurfrules
+.clinerules
+.gemini/

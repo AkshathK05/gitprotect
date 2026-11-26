@@ -1,0 +1,62 @@
+[[rule]]
+id = "BAAS-001"
+severity = "block"
+kind = "line"
+patterns = [
+  '''(?i)disable\s+row\s+level\s+security''',
+  '''(?i)create\s+policy[^;]*using\s*\(\s*true\s*\)''',
+]
+path_include = [
+  '''*.sql''',
+  '''**/*.sql''',
+]
+title = "Insecure Database Row-Level Security Configuration"
+what_happened = "SQL file disables Row Level Security (RLS) or creates an open policy with `USING (true)`."
+fix_steps = [
+  "Enable row level security on tables exposed to client APIs.",
+  "Write specific authorization policies that verify `auth.uid()` or user role instead of `true`.",
+]
+
+[[rule]]
+id = "BAAS-002"
+severity = "block"
+kind = "line"
+patterns = [
+  '''allow\s+[a-z, ]+:\s*if\s+true''',
+  '''request\.auth\s*==\s*null''',
+]
+path_include = [
+  '''firestore.rules''',
+  '''storage.rules''',
+  '''**/firestore.rules''',
+  '''**/storage.rules''',
+]
+title = "Wide-Open Firebase Security Rule"
+what_happened = "Firebase security rule allows unrestricted access (`if true`) or unauthenticated public access (`request.auth == null`)."
+fix_steps = [
+  "Restrict read/write permissions to authenticated users (`request.auth != null`).",
+  "Implement fine-grained ownership or role checks before allowing access.",
+]
+
+[[rule]]
+id = "BAAS-003"
+severity = "warn"
+kind = "line"
+patterns = [
+  '''SUPABASE_SERVICE_ROLE_KEY|firebase-admin''',
+]
+path_include = [
+  '''**/app/**''',
+  '''**/pages/**''',
+  '''**/src/components/**''',
+  '''**/client/**''',
+]
+path_exclude = [
+  '''**/api/**''',
+]
+title = "Admin/Service-Role SDK Used in Client Frontend Code"
+what_happened = "Admin credentials or administrative SDKs (SUPABASE_SERVICE_ROLE_KEY or firebase-admin) referenced in frontend client code."
+fix_steps = [
+  "Use client SDKs (such as anon key / client auth) in frontend components.",
+  "Move all admin SDK operations to server-side API routes or background functions.",
+]
